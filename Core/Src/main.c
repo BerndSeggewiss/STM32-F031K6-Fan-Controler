@@ -309,17 +309,27 @@ static void MX_GPIO_Init(void)
 
 /* USER CODE BEGIN 4 */
 
-long map(int32_t x, int32_t inMin, int32_t inMax, int32_t outMin, int32_t outMax)
+static inline uint16_t map_adc_to_pwm(uint16_t adc, uint16_t adcMax, uint16_t pwmMax)
 {
-	int32_t inputSpan = inMax - inMin;
-	return inputSpan;
+	if (adc >= adcMax) return pwmMax;
+	if (adc <= 1) return 0;
+	return (uint32_t)adc * pwmMax / adcMax;
 }
 
 void HAL_ADC_ConvHalfCpltCallback(ADC_HandleTypeDef* hadc)
 {
-	int32_t pwm_value = map(PWM_Setpoint, 0, 100, 0, 4030);
-    __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, (ADC_ValBuffer[0] << 4));
-	__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, (ADC_ValBuffer[1] << 4));
+
+	const uint16_t adcMax = 4030;	// 100 % Poti value corresponds to ADC-Value of 4030
+	const uint16_t arr = __HAL_TIM_GET_AUTORELOAD(&htim3); // Timer ARR-Value
+	uint16_t adc0 = ADC_ValBuffer[0];
+	uint16_t adc1 = ADC_ValBuffer[1];
+	uint16_t ccr1 = map_adc_to_pwm(adc0, adcMax, arr);
+	uint16_t ccr2 = map_adc_to_pwm(adc1, adcMax, arr);
+	// Option: innvert, if necessary
+	//ccr1 = arr - ccr1;
+	//ccr2 = arr - ccr2;
+	__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, ccr1);
+	__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, ccr2);
 }
 
 /* USER CODE END 4 */
